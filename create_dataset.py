@@ -2,9 +2,9 @@
 # coding: utf-8
 
 import os
-import sys
 from argparse import ArgumentParser
 import cv2
+import matplotlib.pyplot as plt
 import pybullet as pb
 import pybullet_data
 from qibullet import PepperVirtual
@@ -14,25 +14,21 @@ import numpy as np
 import json
 import glob
 
+# todo: define the joints to be explored as argument
 
-# TODO: DO I USE A CUSTOM PEPPERVIRTUAL??
-# TODO: define the joints to be explored as argument
-# todo: add the size of the output image as argument
-# todo: send a warnign when the image_size is bigger than the camera resolution
-# todo: select saving images in binary of as individual images
 
 def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset", dir_bkgd="dataset/background_dataset", keep_green=False):
 
     # check directories
     if not os.path.exists(dir_bkgd):
         print("Error: incorrect path for the background dataset")
-        sys.exit(0)
+        return
 
     if os.path.exists(dir_dataset):
         ans = input(" ".join(["> The folder", dir_dataset, "already exists; do you want to overwrite its content? [y,n]: "]))
         if ans is not "y":
             print("exiting the program")
-            sys.exit(0)
+            return
 
     dir_combined = dir_dataset + "/combined"
     if not os.path.exists(dir_combined):
@@ -41,6 +37,14 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
         dir_green = dir_dataset + "/green"
         if not os.path.exists(dir_green):
             os.makedirs(dir_green)
+
+    # check the desired image_size
+    camera_resolution = (240, 320)
+    if any([a > b for a, b in zip(image_size, camera_resolution)]):
+        ans = input("Warning: the desired image size is larger than Pepper's camera resolution (240, 320). Continue? [y, n]: ")
+        if ans is not "y":
+            print("exiting the program")
+            return
 
     # list the background images
     bkgd_images_list = glob.glob(dir_bkgd + "/*.png")
@@ -83,7 +87,6 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
 
     # subscribe to the camera
     pepper.subscribeCamera(PepperVirtual.ID_CAMERA_BOTTOM)
-    camera_resolution = (240, 320)
 
     # turn the Pepper around to avoid shadows
     pb.resetBasePositionAndOrientation(pepper_ID, posObj=[0, 0, 0], ornObj=pb.getQuaternionFromEuler((0, 0, 1.25 * np.pi)))
@@ -94,8 +97,6 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
 
     # allocate memory
     joints_configs = np.full((number_images, 4), np.nan)
-    images_green = np.full((number_images, int(image_size[0]), int(image_size[1]), 3), np.nan)
-    images_composite = np.full((number_images, int(image_size[0]), int(image_size[1]), 3), np.nan)
 
     # generate the images
     for t in range(number_images):
@@ -129,8 +130,10 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
         # scale the image down
         image_green = cv2.resize(img, dsize=image_size[::-1], interpolation=cv2.INTER_NEAREST)
 
-        # save the green image
-        images_green[t, :, :, :] = image_green
+        # save the green image lossless
+        if keep_green:
+            filename = dir_green + "/img_green_{:05}.png".format(t)
+            cv2.imwrite(filename, image_green, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
         # draw a random background
         background = cv2.imread(np.random.choice(bkgd_images_list))
@@ -143,8 +146,9 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
         to_fill = (image_green[:, :, 0] == 0) & (image_green[:, :, 1] == 141) & (image_green[:, :, 2] == 0)
         image_green[to_fill, :] = background[to_fill, :]
 
-        # save the composite image
-        images_composite[t, :, :, :] = image_green
+        # save the composite image lossless
+        filename = dir_combined + "/img_{:05}.png".format(t)
+        cv2.imwrite(filename, image_green, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
         # display the composite image
         cv2.imshow('mit', image_green)
@@ -157,23 +161,40 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset
         controller._terminateController()
     pb.disconnect()
 
-    # save the data
-    print("saving the data...")
-
-    with open(dir_combined + "/positions.json", 'w') as file:
+    # save the joint configuration data
+    with open(dir_combined + "/positions.txt", 'w') as file:
         json.dump(joints_configs.tolist(), file)
-    with open(dir_combined + "/images.json", 'w') as file:
-        json.dump(images_composite.tolist(), file)
-
     if keep_green:
-        with open(dir_green + "/positions.json", 'w') as file:
+        with open(dir_green + "/positions.txt", 'w') as file:
             json.dump(joints_configs.tolist(), file)
-        with open(dir_green + "/images.json", 'w') as file:
-            json.dump(images_green.tolist(), file)
 
     print("done")
 
-    sys.exit(0)
+
+def display_samples(dir_dataset, index=9, block=True):
+
+    # check the directory
+    files_list = sorted(glob.glob(dir_dataset + "/*.png"))
+    n_samples = len(files_list)
+    if n_samples == 0:
+        print("Error: the directory doesn't contain any png image.")
+        return
+
+    if type(index) == int:
+        index = np.random.choice(n_samples, index)
+
+    # plot the images
+    n_col = np.ceil(np.sqrt(len(index)))
+    n_row = np.ceil(len(index) / n_col)
+    fig = plt.figure()
+    for i, ind in enumerate(index):
+        image = plt.imread(files_list[ind])
+        ax = fig.add_subplot(n_row, n_col, i+1)
+        ax.imshow(image)
+        ax.set_title("image " + str(ind))
+        ax.axis("off")
+    plt.show(block=block)
+    return
 
 
 if __name__ == "__main__":
@@ -181,7 +202,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-n", "--n_samples", dest="number_images", help="number of images to generate", type=int, default=8000)
     parser.add_argument("-s", "--size", dest="image_size", help="image's height and width", nargs=2, type=int, default=[60, 80])
-    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="directory in which to save the data", default="dataset/combined")
+    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="directory in which to save the data", default="dataset/generated")
     parser.add_argument("-db", "--dir_bkgd", dest="dir_bkgd", help="directory of background images", default="dataset/background_dataset")
     parser.add_argument("-g", "--green", dest="keep_green", help="flag to store the raw images with the green background", type=bool, default=False)
 
@@ -195,3 +216,8 @@ if __name__ == "__main__":
 
     # run the simulation
     create_dataset(number_images=number_images, image_size=image_size, dir_dataset=dir_dataset, dir_bkgd=dir_bkgd, keep_green=keep_green)
+
+    # todo: it still writes green images when flag -g is set to False
+
+    # display some samples
+    display_samples(dir_dataset + "/combined", index=9)
