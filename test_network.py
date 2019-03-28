@@ -307,7 +307,7 @@ def evaluate_mask(dir_model="model/trained", dir_green_dataset="dataset/generate
     # s = s_normalizer.transform(s)
 
     # load the data
-    m, s = load_data(dir_dataset)
+    m, s = load_data(dir_green_dataset)
     number_samples, height, width, number_channels = s.shape
     number_joints = m.shape[1]
 
@@ -317,11 +317,9 @@ def evaluate_mask(dir_model="model/trained", dir_green_dataset="dataset/generate
 
     m_normalizer = Normalizer(low=-1, high=1)
     m = m_normalizer.fit_transform(m)
-    m = m[indexes, :]
 
     s_normalizer = Normalizer(low=0, high=1, min_data=0, max_data=1)  # identity mapping in this case, as the pixel values are already in [0, 1]
     s = s_normalizer.transform(s)
-    s = s[indexes, :]
 
     # reload the network
     tf.reset_default_graph()
@@ -597,9 +595,9 @@ if __name__ == "__main__":
     dir_dataset = args.dir_dataset
 
 ####
-    dir_model = "../_old_learn-masked-body-image/.saved_models/pred_error/qibullet_arm/Abd_RGB_CLEAN_INPAINTING"
+    dir_model = "../_old_learn-masked-body-image/.saved_models/pred_error/qibullet_arm/Abd_RGB_CLEAN_INPAINTING_RERUN2"
     dir_dataset = ".dataset/generated/combined"
-    dir_green_dataset = ".dataset/generated/combined"
+    dir_green_dataset = ".dataset/generated/green"
 ####
 
     reconstruct_training_data(dir_model=dir_model, dir_dataset=dir_dataset, indexes=3)

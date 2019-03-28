@@ -99,7 +99,4 @@ def load_data(dir_dataset):
         with open(dir_dataset + "/images.json", "r") as file:
             s = np.array(json.load(file))
 
-    number_samples, height, width, number_channels = s.shape
-    number_joints = m.shape[1]
-
     return m, s
