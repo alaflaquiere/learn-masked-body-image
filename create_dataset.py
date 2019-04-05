@@ -118,7 +118,7 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset=".datase
     print("generating the data...")
     for t in range(number_images):
 
-        if t % max(1, int(number_images/100)) == 0:
+        if t % max(1, number_images//100) == 0:
             print("\r{:3.0f}%".format((t+1)/number_images * 100), end="")
 
         # draw random joints configurations

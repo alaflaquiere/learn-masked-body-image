@@ -6,6 +6,7 @@ import os
 import glob
 import json
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 
 class Normalizer:
@@ -63,6 +64,79 @@ def create_checkerboard(height, width):
 
 
 def load_data(dir_dataset):
+    """
+    Load sensorimotor data.
+
+    Parameters:
+        dir_dataset - dataset directory
+    """
+
+    # check directories
+    if not os.path.exists(dir_dataset):
+        print("Error: the dataset directory {} doesn't exist.".format(dir_dataset))
+        return
+    # check the content of the directory
+    images_list = glob.glob(dir_dataset + "/*.png")
+    if len(images_list) == 0:
+        print("Error: the directory {} doesn't contain any png image.".format(dir_dataset))
+        return
+    if not os.path.exists(dir_dataset + "/positions.txt"):
+        print("Error: the directory {} doesn't contain a positions.txt file.".format(dir_dataset))
+        return
+
+    # load the motor data
+    with open(dir_dataset + "/positions.txt", "r") as file:
+        m = np.array(json.load(file))
+
+    # load the sensory data
+    for i, file in enumerate(images_list):
+        img = plt.imread(file)
+        if i == 0:
+            s = np.full((len(images_list), img.shape[0], img.shape[1], 3), np.nan)
+        s[i, :, :, :] = img
+
+    # get dataset parameters
+    number_samples, height, width, number_channels = s.shape
+    number_joints = m.shape[1]
+
+    # check the data compatibility
+    temp = m.shape[0]
+    if not number_samples == temp:
+        print("Error: incompatible number of motor_input configurations and images ({} != {})".format(temp, number_samples))
+        return
+    print("loaded data: {} samples, {} joints, {}x{}x{} images".format(number_samples, number_joints, height, width, number_channels))
+
+    return m, s, number_samples, height, width, number_channels, number_joints
+
+
+def load_network(dir_model):
+    """
+    Load a network and return useful placeholders data.
+
+    Parameters:
+        dir_dataset - dataset directory
+    """
+
+    # check model directory
+    if not os.path.exists(dir_model) or not os.path.exists(dir_model + "/network.ckpt.meta"):
+        print("Error: the directory {} doesn't exist or doesn't contain a network.ckpt.meta file.".format(dir_model))
+        return
+
+    # reload the graph
+    tf.reset_default_graph()
+    saver = tf.train.import_meta_graph(dir_model + "/network.ckpt.meta")
+    graph = tf.get_default_graph()
+
+    # recover the input and outputs
+    motor_input = graph.get_tensor_by_name("motor_input:0")
+    predicted_image = graph.get_tensor_by_name("image_branch/predicted_image/Relu:0")
+    predicted_error = graph.get_tensor_by_name("error_branch/predicted_error/Relu:0")
+
+    return saver, motor_input, predicted_image, predicted_error
+
+
+def _load_data(dir_dataset):
+    # DEPRECATED
 
     print("loading the data...")
 

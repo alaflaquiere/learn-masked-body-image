@@ -11,39 +11,6 @@ import matplotlib.pyplot as plt
 plt.ion()
 
 
-def load_sensorimotor_data(dir_dataset):
-    """
-    Load sensoirmotor data.
-
-    Parameters:
-        dir_dataset - dataset directory
-    """
-
-    # check directories
-    if not os.path.exists(dir_dataset):
-        print("Error: the dataset directory {} doesn't exist.".format(dir_dataset))
-        return
-    # check the content of the directory
-    images_list = glob.glob(dir_dataset + "/*.png")
-    if len(images_list) == 0:
-        print("Error: the directory {} doesn't contain any png image.".format(dir_dataset))
-        return
-
-    # load the data
-    m, s = load_data(dir_dataset)
-    number_samples, height, width, number_channels = s.shape
-    number_joints = m.shape[1]
-
-    # check the data compatibility
-    temp = m.shape[0]
-    if not number_samples == temp:
-        print("Error: incompatible number of motor_input configurations and images ({} != {})".format(temp, number_samples))
-        return
-    print("loaded data: {} samples, {} joints, {}x{}x{} images".format(number_samples, number_joints, height, width, number_channels))
-
-    return m, s
-
-
 class SensoriMotorPredictionNetwork:
 
         def __init__(self, n_joints, height, width, n_filter):
@@ -51,8 +18,8 @@ class SensoriMotorPredictionNetwork:
             self.height = height
             self.width = width
             self.n_filter = n_filter
-            self.motor_input, self.gt_image, self.predicted_image, self.predicted_error, self.loss = self.create_network(self.n_joints, self.height,
-                                                                                                                         self.width, n_filter)
+            self.motor_input, self.gt_image, self.predicted_image, self.predicted_error, self.weight_error_loss, self.loss =\
+                self.create_network(self.n_joints, self.height, self.width, n_filter)
             self.m_normalizer = Normalizer(low=-1, high=1)
             self.s_normalizer = Normalizer(low=0, high=1, min_data=0, max_data=1) # equal identity here as pixels are already in [0,1]
             self.saver = tf.train.Saver()
@@ -79,6 +46,7 @@ class SensoriMotorPredictionNetwork:
             # create placeholders
             motor_input = tf.placeholder(dtype=tf.float32, shape=[None, n_joints], name="motor_input")
             gt_image = tf.placeholder(dtype=tf.float32, shape=[None, h, w, 3], name="gt_image")
+            weight_error_loss = tf.placeholder(dtype=tf.float32, shape=[], name="weight_error_loss")
 
             # dense mapping to larger layers
             with tf.name_scope("dense_expand") as scope:
@@ -126,9 +94,10 @@ class SensoriMotorPredictionNetwork:
                 loss_reconstruction = tf.reduce_mean(errors_image, name="loss_reconstruction")
                 errors_mask = tf.abs(tf.subtract(err, errors_image), name="errors_mask")
                 loss_mask = tf.reduce_mean(errors_mask, name="loss_error")
+                loss_mask = tf.multiply(weight_error_loss, loss_mask, name="weighted_loss_error")
                 loss = tf.add(loss_reconstruction, loss_mask, name="loss")
 
-            return motor_input, gt_image, img, err, loss
+            return motor_input, gt_image, img, err, weight_error_loss, loss,
 
         def save_network(self):
             self.saver.save(tf.get_default_session(), dir_model + "/network.ckpt")  # add global_step=global_step to not overwrite the previous model
@@ -136,6 +105,7 @@ class SensoriMotorPredictionNetwork:
         def train(self, m, s, dir_model="model/trained", n_epochs=int(5e4), batch_size=100):
             """
             Train the network.
+            The error-predition component of the loss is weighted with an weight increasing from 0 to 1 during the first half of training.
 
             Parameters:
                 m - motor data
@@ -160,7 +130,7 @@ class SensoriMotorPredictionNetwork:
                 os.makedirs(dir_progress)
 
             # get the number of samples
-            number_samples = s.shape[0]
+            n_samples = s.shape[0]
 
             # normalize the motor_input configuration in [-1, 1]
             m = self.m_normalizer.fit_transform(m)
@@ -175,6 +145,9 @@ class SensoriMotorPredictionNetwork:
             optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
             minimize_op = optimizer.minimize(self.loss, global_step=global_step)
 
+            # define the weighting of the error_loss - ramp up from 0 to 1 during the first half of training
+            weight_err = tf.train.polynomial_decay(0., global_step, n_epochs//2, 1., power=1)
+
             # train the network
             print("training the network...")
             with tf.Session() as sess:
@@ -185,22 +158,25 @@ class SensoriMotorPredictionNetwork:
                 for epoch in range(n_epochs):
 
                     # draw batch indexes
-                    indexes = np.random.choice(number_samples, batch_size, replace=True)
+                    indexes = np.random.choice(n_samples, batch_size, replace=True)
 
                     # minimize the loss
-                    curr_loss, _, curr_lr = sess.run([self.loss, minimize_op, learning_rate],
-                                                     feed_dict={self.motor_input: m[indexes, :], self.gt_image: s[indexes, :, :]})
+                    curr_weight = sess.run(weight_err)
+                    curr_loss, _, curr_lr = sess.run([self.loss, minimize_op, learning_rate], feed_dict={self.motor_input: m[indexes, :],
+                                                                                                         self.gt_image: s[indexes, :, :],
+                                                                                                         self.weight_error_loss: curr_weight})
 
                     if (epoch % max(1, np.round(n_epochs/100)) == 0) or (epoch == n_epochs - 1):
 
-                        print("epoch: {} ({:3.0f}%), learning rate: {:.4e}, loss: {:.4e}".format(epoch, epoch/n_epochs*100, curr_lr, curr_loss))
+                        print("epoch: {} ({:3.0f}%), learning rate: {:.4e}, error loss weight: {:.4e}, loss: {:.4e}".format(epoch, epoch/n_epochs*100,
+                                                                                                                            curr_lr, curr_weight,
+                                                                                                                            curr_loss))
 
                         # visualize one output
                         curr_image, curr_error = sess.run([self.predicted_image, self.predicted_error],
                                                           feed_dict={self.motor_input: m[[indexes[0]], :]})
                         curr_image = self.s_normalizer.reconstruct(curr_image)
-                        # todo: fit a GMM on the fly to have a dynamic threshold instead of a fixed value
-                        binary_mask = (curr_error[0] < 0.056).astype(float)
+                        binary_mask = (curr_error[0] < 0.056).astype(float)  # the htreshold value could be estimated on the fly with a GMM
                         self.display_figure(s[indexes[0]], curr_image[0], curr_error[0], binary_mask)
 
                         # save the visualization
@@ -276,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("-dm", "--dir_model", dest="dir_model", help="directory in which to save the model", default=".model/trained")
     parser.add_argument("-n", "--n_epochs", dest="number_epochs", help="number of mini-batch epochs", type=int, default=5e4)
     parser.add_argument("-b", "--batch_size", dest="batch_size", help="mini-batch size", type=int, default=100)
-    parser.add_argument("-nf", "--n_filters", dest="n_filters", help="maximal number of convolutional filters", type=int, default=32)
+    parser.add_argument("-nf", "--n_filters", dest="n_filters", help="maximal number of convolutional filters", type=int, default=64)
 
     args = parser.parse_args()
     dir_dataset = args.dir_dataset
@@ -286,10 +262,7 @@ if __name__ == "__main__":
     n_filters = args.n_filters
 
     # load the dataset
-    motor_data, sensor_data = load_sensorimotor_data(dir_dataset=dir_dataset)
-    n_joints = motor_data.shape[1]
-    height = sensor_data.shape[1]
-    width = sensor_data.shape[2]
+    motor_data, sensor_data, number_samples, height, width, number_channels, n_joints = load_data(dir_dataset=dir_dataset)
 
     # create the network
     network = SensoriMotorPredictionNetwork(n_joints, height, width, n_filter=n_filters)
