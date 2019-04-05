@@ -25,13 +25,16 @@ If you are using this implementation in your research, please consider giving cr
 * tools.py: collection of useful functions.
 
 ## Usage
+
+<img src="illustrations/dataset.png" width="80%">
+
 To create a new dataset, put the png images that will be used as background in the folder "./dataset/background_dataset" and run the script create_dataset:
 ```
 python create_dataset.py
 ```
 It will create the dataset and save it in ".dataset/generated".
 
-![dataset_creation](illustrations/dataset.png?raw=true "Dataset creation")
+<img src="illustrations/network.png" width="80%">
 
 To train a network on the dataset, run the script learn_body_image:
 ```
@@ -39,21 +42,18 @@ python learn_body_image.py
 ```
 It will save the optimized network in ".model/trained", along a visualization of the network progress in ".model/trained/progress".
 
-![network_architecture](illustrations/network.png?raw=true "Network architecture")
-<img src="illustrations/network.png" width="60%">
 
 ## Model
 A pre-trained model is provided in ".model/paper". To load and test it, use the following command:
 ```
 python test_network.py
 ```
-![results](illustrations/results.png?raw=true "Results")
 
-![quantitative_evaluation](illustrations/quantitative_evaluation.png?raw=true "Quantitative evaluation")
-<img src="illustrations/quantitative_evaluation.png" width="50%">
+<img src="illustrations/results.png">
 
-![motor_exploration](illustrations/results2.png?raw=true "Exploration of the motor space")
-<img src="illustrations/results2.png" width="60%">
+<img src="illustrations/quantitative_evaluation.png" width="80%">
+
+<img src="illustrations/results2.png" width="80%">
 
 ## Advanced control
 For a finer control of the simulation parameters
