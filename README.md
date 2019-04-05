@@ -51,9 +51,15 @@ python test_network.py
 
 <img src="illustrations/results.png">
 
+<br/><br/>
+
 <img src="illustrations/quantitative_evaluation.png" width="80%">
 
+<br/><br/>
+
 <img src="illustrations/results2.png" width="80%">
+
+<br/><br/>
 
 ## Advanced control
 For a finer control of the simulation parameters
