@@ -44,7 +44,7 @@ It will save the optimized network in ".model/trained", along a visualization of
 
 
 ## Model
-A pre-trained model is provided in ".model/paper". To load and test it, use the following command:
+A pre-trained model is provided in ".model/trained". To load and test it, use the following command:
 ```
 python test_network.py
 ```
