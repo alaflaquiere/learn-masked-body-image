@@ -31,12 +31,12 @@ All scripts should be run using Python3.5.
   
 <img src="illustrations/dataset.png" width="80%">
   
-To create a new dataset, put the png images that will be used as background in the folder "./dataset/background_dataset" and run the script create_dataset:
+To create a new dataset, put the png images that will be used as background in the folder "/dataset/background_dataset" and run the script create_dataset:
 
 ```
 python create_dataset.py
 ```
-It will create the dataset and save it in ".dataset/generated".
+It will create the dataset and save it in "dataset/generated".
 
   
 <img src="illustrations/network.png" width="80%">
@@ -46,7 +46,7 @@ To train a network on the dataset, make sure that tensorflow is properly install
 ```
 python learn_body_image.py
 ```
-It will save the optimized network in ".model/trained", along a visualization of the network progress in ".model/trained/progress".
+It will save the optimized network in "model/trained", along a visualization of the network progress in "model/trained/progress".
 
 
 ## Model
@@ -68,7 +68,7 @@ python test_network.py
 
 <br/><br/>
 
-It will also create a video of a random exploration of the motor space and save it in ".temp/video".
+It will also create a video of a random exploration of the motor space and save it in "temp/video".
 
 
 ## Advanced control
