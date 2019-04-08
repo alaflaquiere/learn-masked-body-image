@@ -19,11 +19,13 @@ If you are using this implementation in your research, please consider giving cr
 
 All scripts should be run using Python3.5.
 
+
 ## Files
 * create_dataset.py: python3 script to generate a dataset of first-person views of a simulated Pepper robot's right arm moving in front of varying background images.
 * learn_body_image.py: python3 script to train a deep neural network to predict a first-person view image and associated prediction error given an input motor configuration.
 * test_network.py: python3 script to test the deep neural network.
 * tools.py: collection of useful functions.
+
 
 ## Usage
   
@@ -66,7 +68,11 @@ python test_network.py
 
 <br/><br/>
 
+It will also create a video of a random exploration of the motor space and save it in ".temp/video".
+
+
 ## Advanced control
+
 For a finer control of the simulation parameters
 ```
 python create_dataset.py -n <number_images> -s <image_height> <image_width> -dd <dataset_destination_directory> -db <background_dataset_directory> -g <bool to save the intermediary images with a green background>
