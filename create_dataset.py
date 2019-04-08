@@ -15,7 +15,7 @@ import json
 import glob
 
 
-def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset=".dataset", dir_bkgd=".dataset/background_dataset", keep_green=False):
+def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset="dataset", dir_bkgd="dataset/background_dataset", keep_green=False):
     """
     Create a dataset of first-person-view images of the Pepper robot moving its right arm.
     A simulated Pepper created thanks to qibullet moves its arm in front of a green wall by randomly changing
@@ -188,7 +188,7 @@ def create_dataset(number_images=8000, image_size=(60, 80), dir_dataset=".datase
     print("data generation finished")
 
 
-def display_samples(dir_dataset, index=9):
+def display_samples(dir_dataset="dataset/generated/combined", index=9):
     """
     Display same image samples from the input dataset.
 
@@ -231,8 +231,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-n", "--n_samples", dest="number_images", help="number of images to generate", type=int, default=8000)
     parser.add_argument("-s", "--size", dest="image_size", help="image's height and width", nargs=2, type=int, default=[60, 80])
-    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="directory in which to save the data", default=".dataset/generated")
-    parser.add_argument("-db", "--dir_bkgd", dest="dir_bkgd", help="directory of background images", default=".dataset/background_dataset")
+    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="directory in which to save the data", default="dataset/generated")
+    parser.add_argument("-db", "--dir_bkgd", dest="dir_bkgd", help="directory of background images", default="dataset/background_dataset")
     parser.add_argument("-g", "--green", dest="keep_green", help="flag to store the raw images with the green background", type=bool, default=True)
 
     # get arguments

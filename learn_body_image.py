@@ -247,8 +247,8 @@ class SensoriMotorPredictionNetwork:
 if __name__ == "__main__":
 
     parser = ArgumentParser()
-    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="dataset directory", default=".dataset/generated/combined")
-    parser.add_argument("-dm", "--dir_model", dest="dir_model", help="directory in which to save the model", default=".model/trained")
+    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="dataset directory", default="dataset/generated/combined")
+    parser.add_argument("-dm", "--dir_model", dest="dir_model", help="directory in which to save the model", default="model/trained")
     parser.add_argument("-n", "--n_epochs", dest="number_epochs", help="number of mini-batch epochs", type=int, default=5e4)
     parser.add_argument("-b", "--batch_size", dest="batch_size", help="mini-batch size", type=int, default=100)
     parser.add_argument("-nf", "--n_filters", dest="n_filters", help="maximal number of convolutional filters", type=int, default=64)
