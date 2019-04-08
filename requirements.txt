@@ -6,5 +6,5 @@ qibullet==1.0.6
 scikit-learn==0.20.3
 scipy==1.2.1
 sklearn==0.0
-tensorflow-gpu==1.4.0
-tensorflow-tensorboard==0.4.0
+tensorflow-gpu
+tensorflow-tensorboard

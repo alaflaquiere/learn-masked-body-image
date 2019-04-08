@@ -17,6 +17,7 @@ If you are using this implementation in your research, please consider giving cr
       organization={IEEE}
     }
 
+All scripts should be run using Python3.5.
 
 ## Files
 * create_dataset.py: python3 script to generate a dataset of first-person views of a simulated Pepper robot's right arm moving in front of varying background images.
@@ -25,18 +26,21 @@ If you are using this implementation in your research, please consider giving cr
 * tools.py: collection of useful functions.
 
 ## Usage
-
+  
 <img src="illustrations/dataset.png" width="80%">
-
+  
 To create a new dataset, put the png images that will be used as background in the folder "./dataset/background_dataset" and run the script create_dataset:
+
 ```
 python create_dataset.py
 ```
 It will create the dataset and save it in ".dataset/generated".
 
+  
 <img src="illustrations/network.png" width="80%">
-
-To train a network on the dataset, run the script learn_body_image:
+  
+  
+To train a network on the dataset, make sure that tensorflow is properly installed, and run the script learn_body_image:
 ```
 python learn_body_image.py
 ```
@@ -44,6 +48,7 @@ It will save the optimized network in ".model/trained", along a visualization of
 
 
 ## Model
+
 A pre-trained model is provided in ".model/trained". To load and test it, use the following command:
 ```
 python test_network.py

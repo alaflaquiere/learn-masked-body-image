@@ -76,7 +76,7 @@ def load_data(dir_dataset):
         print("Error: the dataset directory {} doesn't exist.".format(dir_dataset))
         return
     # check the content of the directory
-    images_list = glob.glob(dir_dataset + "/*.png")
+    images_list = sorted(glob.glob(dir_dataset + "/*.png"))
     if len(images_list) == 0:
         print("Error: the directory {} doesn't contain any png image.".format(dir_dataset))
         return
