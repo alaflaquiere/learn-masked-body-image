@@ -51,9 +51,11 @@ It will save the optimized network in "model/trained", along a visualization of 
 
 ## Model
 
-A pre-trained model is provided in ".model/trained". To load and test it, use the following command:
+A pre-trained model is provided in "model/trained_nominal_32filters_scheduledweighterror". To load and test it, use the following command
+(assuming you already created a dataset in "dataset/generated"):
+
 ```
-python test_network.py
+python test_network.py -dm model/trained_nominal_32filters_scheduledweighterror
 ```
 
 <img src="illustrations/results.png">

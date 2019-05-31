@@ -539,10 +539,10 @@ def generate_video(dir_model="model/trained", n_samples=2000, dir_video="temp/vi
 if __name__ == "__main__":
 
     parser = ArgumentParser()
-    parser.add_argument("-dm", "--dir_model", dest="dir_model", help="path to the model", default=".model/trained")
-    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="path to training dataset", default=".dataset/generated/combined")
-    parser.add_argument("-dg", "--dir_green", dest="dir_green_dataset", help="path to training dataset with green background", default=".dataset/generated/green")
-    parser.add_argument("-dv", "--dir_video", dest="dir_video", help="directory to save the video", default=".temp/video")
+    parser.add_argument("-dm", "--dir_model", dest="dir_model", help="path to the model", default="model/trained")
+    parser.add_argument("-dd", "--dir_dataset", dest="dir_dataset", help="path to training dataset", default="dataset/generated/combined")
+    parser.add_argument("-dg", "--dir_green", dest="dir_green_dataset", help="path to training dataset with green background", default="dataset/generated/green")
+    parser.add_argument("-dv", "--dir_video", dest="dir_video", help="directory to save the video", default="temp/video")
 
     args = parser.parse_args()
     dir_model = args.dir_model

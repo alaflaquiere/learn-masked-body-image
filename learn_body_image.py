@@ -231,10 +231,11 @@ class SensoriMotorPredictionNetwork:
             ax4.axis("off")
 
             ax5.cla()
-            masked_image = np.dstack((pred_image, np.mean(mask, axis=2)))
+            alpha_channel = np.mean(mask, axis=2)
+            transparent_masked_predicted_image = np.dstack((pred_image * mask, alpha_channel))
             ax5.set_title('masked prediction')
             ax5.imshow(checkerboard)
-            ax5.imshow(masked_image)
+            ax5.imshow(transparent_masked_predicted_image)
             ax5.axis("off")
 
             plt.show(block=False)
