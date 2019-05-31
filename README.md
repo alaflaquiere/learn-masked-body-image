@@ -10,7 +10,7 @@ This repository contains the code associated with the method described in the pa
 If you are using this implementation in your research, please consider giving credit by citing our paper:
 
     @inproceedings{laflaquiere2019bodyimage,
-      title={Unsupervised Body Image Acquisition Using a Deep Neural Network for Sensorimotor Prediction},
+      title={Self-supervised Body Image Acquisition Using a Deep Neural Network for Sensorimotor Prediction},
       author={Laflaqui\`ere, Alban and Hafner, Verena},
       booktitle={9th Joint IEEE International Conference on Development and Learning and Epigenetic Robotics (ICDL-EpiRob)},
       year={2019},
