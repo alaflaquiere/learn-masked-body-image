@@ -9,12 +9,14 @@ from sklearn import mixture
 from scipy import interpolate
 import cv2
 from tools import Normalizer, create_checkerboard, load_data, load_network
+import colorsys
+from matplotlib.colors import rgb_to_hsv
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 plt.ion()
 
 
-def reconstruct_training_data(dir_model="model/trained", dir_dataset="dataset/generated/combined", indexes=6):
+def reconstruct_data(dir_model="model/trained", dir_dataset="dataset/generated/combined", indexes=11):
     """
     Test a network by reconstructing samples from the dataset.
 
@@ -42,10 +44,14 @@ def reconstruct_training_data(dir_model="model/trained", dir_dataset="dataset/ge
     s = s[indexes, :]
 
     # load the network
-    saver, motor_input, predicted_image, predicted_error = load_network(dir_model)
+    saver, motor_input, net_predicted_image, net_predicted_error = load_network(dir_model)
 
     # create a background checkerboard
     checkerboard = create_checkerboard(height, width)
+
+    # create a figure
+    fig = plt.figure(figsize=(18, 7))
+    fig.suptitle('samples {}'.format(indexes), fontsize=12)
 
     # display the reconstructions
     with tf.Session() as sess:
@@ -56,53 +62,51 @@ def reconstruct_training_data(dir_model="model/trained", dir_dataset="dataset/ge
         for i, ind in enumerate(indexes):
 
             # ground truth image
-            gt_image = s[i, :, :, :]
+            gt_green_image = s[i, :, :, :]
 
             # predict image
-            curr_image = sess.run(predicted_image, feed_dict={motor_input: m[[i], :]})
-            curr_image = curr_image[0]
-            curr_image = s_normalizer.reconstruct(curr_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
+            predicted_image = sess.run(net_predicted_image, feed_dict={motor_input: m[[i], :]})[0]
+            predicted_image = s_normalizer.reconstruct(predicted_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
 
             # predict error
-            curr_error = sess.run(predicted_error, feed_dict={motor_input: m[[i], :]})
-            curr_error = curr_error[0]
+            predicted_error = sess.run(net_predicted_error, feed_dict={motor_input: m[[i], :]})[0]
 
             # build mask
-            curr_mask = (curr_error <= 0.056).astype(float)
+            predicted_mask = (predicted_error <= 0.056).astype(float)
 
             # build the masked image
-            curr_masked_image = np.dstack((curr_image, np.mean(curr_mask, axis=2)))
+            alpha_channel = np.mean(predicted_mask, axis=2)
+            transparent_masked_predicted_image = np.dstack((predicted_image * predicted_mask, alpha_channel))
 
             # display
-            fig = plt.figure(figsize=(12, 6))
-            ax1 = fig.add_subplot(131)
-            ax2 = fig.add_subplot(232)
-            ax3 = fig.add_subplot(233)
-            ax4 = fig.add_subplot(235)
-            ax5 = fig.add_subplot(236)
-            #
-            fig.suptitle('sample {}'.format(ind), fontsize=12)
+            ax1 = fig.add_subplot(5, len(indexes), 0*len(indexes) + 1 + i)
+            ax2 = fig.add_subplot(5, len(indexes), 1*len(indexes) + 1 + i)
+            ax3 = fig.add_subplot(5, len(indexes), 2*len(indexes) + 1 + i)
+            ax4 = fig.add_subplot(5, len(indexes), 3*len(indexes) + 1 + i)
+            ax5 = fig.add_subplot(5, len(indexes), 4*len(indexes) + 1 + i)
             #
             ax1.set_title("ground-truth image")
-            ax1.imshow(gt_image)
+            ax1.imshow(gt_green_image)
             ax1.axis("off")
             #
             ax2.set_title("predicted image")
-            ax2.imshow(curr_image)
+            ax2.imshow(predicted_image)
             ax2.axis("off")
             #
             ax3.set_title("predicted error")
-            ax3.imshow(curr_error)
+            ax3.imshow(predicted_error)
             ax3.axis("off")
             #
             ax4.set_title("mask")
-            ax4.imshow(curr_mask)
+            ax4.imshow(predicted_mask)
             ax4.axis("off")
             #
             ax5.set_title('masked predicted image')
             ax5.imshow(checkerboard)
-            ax5.imshow(curr_masked_image)
+            ax5.imshow(transparent_masked_predicted_image)
             ax5.axis("off")
+        #
+        # fig.savefig(".temp/reconstruction/reconstructions.svg")
 
     plt.show(block=False)
     plt.pause(0.001)
@@ -134,112 +138,112 @@ def evaluate_body_image(dir_model="model/trained", dir_green_dataset="dataset/ge
     s = s_normalizer.transform(s)
 
     # load the network
-    saver, motor_input, predicted_image, predicted_error = load_network(dir_model)
+    saver, motor_input, net_predicted_image, net_predicted_error = load_network(dir_model)
 
     # create a background checkerboard
     checkerboard = create_checkerboard(height, width)
 
-    # track all matches over the training set
-    all_mask_match = []
+    # track all matches over the dataset
+    all_iou_body = []
     all_appearance_match = []
+
+    # create figure
+    fig = plt.figure(figsize=(9, 10))
+    fig.suptitle('samples {}'.format(indexes), fontsize=12)
 
     with tf.Session() as sess:
 
         # reload the network's variable values
         saver.restore(sess, tf.train.latest_checkpoint(dir_model + "/"))
 
+        # track the number of displayed indexes
+        i = 0
+
         # compute the mask and appearance matches over the whole dataset
         for ind in range(n_samples):
 
-            # image with green background
-            green_image = s[ind, :, :, :]
+            # ground-truth image
+            gt_green_image = s[ind, :, :, :]  # image with green background - [height, width, 3] in [0, 1]
 
-            # mask of the green background
-            where_green = ((green_image[:, :, 0] == 0) & (abs(green_image[:, :, 1] - 141/255) <= 1e-3) & (green_image[:, :, 2] == 0)).astype(float)
-            where_green = np.repeat(where_green[:, :, np.newaxis], 3, axis=2)  # copy on all three RGB channels
+            # ground-truth body mask
+            gt_body_mask = ((gt_green_image[:, :, 0] == 0) & (abs(gt_green_image[:, :, 1] - 141/255) <= 1e-3) & (gt_green_image[:, :, 2] == 0)).astype(float)
+            gt_body_mask = 1 - np.repeat(gt_body_mask[:, :, np.newaxis], 3, axis=2)  # ground-truth body mask - [height, width, 3] in (0., 1.)
 
-            # predict image
-            curr_image = sess.run(predicted_image, feed_dict={motor_input: m[[ind], :]})
-            curr_image = curr_image[0]
-            curr_image = s_normalizer.reconstruct(curr_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
+            # predicted image - [height, width, 3] in [0, 1+]
+            predicted_image = sess.run(net_predicted_image, feed_dict={motor_input: m[[ind], :]})[0]
+            predicted_image = s_normalizer.reconstruct(predicted_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
 
-            # predict error
-            curr_error = sess.run(predicted_error, feed_dict={motor_input: m[[ind], :]})
-            curr_error = curr_error[0]
+            # predicted error - [height, width, 3] in [0, 1+]
+            predicted_error = sess.run(net_predicted_error, feed_dict={motor_input: m[[ind], :]})[0]
 
-            # build mask
-            curr_mask = (curr_error <= 0.056).astype(float)
+            # predicted body mask
+            predicted_body_mask = (predicted_error <= 0.056).astype(float)  # [height, width, 3] in (0., 1.)
 
-            # build the masked predicted image
-            curr_masked_image = np.dstack((curr_image, np.mean(curr_mask, axis=2)))
+            # evaluation of the predicted mask: Intersection over Union
+            intersection = np.logical_and(gt_body_mask, predicted_body_mask)
+            union = np.logical_or(gt_body_mask, predicted_body_mask)
+            iou_body_mask = np.sum(intersection) / np.sum(union) if np.sum(union) > 0 else 1
 
-            # build the masked green-background image
-            curr_masked_green_image = np.dstack((green_image, np.mean(curr_mask, axis=2)))
+            # error in the predicted image
+            error_image = gt_green_image - predicted_image  # [height, width, 3] in [0., 1.+]
 
-            # error between green background mask and predicted mask
-            error_mask_green = where_green - (1 - curr_mask)
+            # evaluation of the body appearance: mean error under the intersection of masks
+            masked_image_error = error_image * intersection
+            appearance_match = 1 - np.sum(np.abs(masked_image_error)) / np.sum(intersection) if np.sum(intersection) > 0 else 1
 
-            # matching between the two masks
-            mask_match = 1 - np.sum(np.abs(error_mask_green)) / np.prod(error_mask_green.shape)
+            # creation of the mask images with transparency for display
+            alpha_channel = np.mean(intersection, axis=2)
+            transparent_masked_gt_image = np.dstack((gt_green_image * intersection, alpha_channel))
+            transparent_masked_predicted_image = np.dstack((predicted_image * intersection, alpha_channel))
 
-            # error between the arm appearance under the predicted mask
-            image_error = np.abs(green_image - curr_image)
-            image_error = image_error * curr_mask
-
-            # matching between the appearances between the predicted mask
-            if not np.sum(curr_mask) == 0:
-                appearance_match = 1 - np.sum(np.abs(image_error)) / np.sum(curr_mask)
-            else:
-                appearance_match = 1
-
-            # store the matches
-            all_mask_match.append(mask_match)
+            # store the matches and scores
+            all_iou_body.append(iou_body_mask)
             all_appearance_match.append(appearance_match)
 
             # display the matches for the selected indexes
             if ind in indexes:
 
                 # display
-                fig = plt.figure(figsize=(12, 6))
-                ax1 = fig.add_subplot(231)
-                ax2 = fig.add_subplot(232)
-                ax3 = fig.add_subplot(233)
-                ax4 = fig.add_subplot(234)
-                ax5 = fig.add_subplot(235)
-                ax6 = fig.add_subplot(236)
+                ax1 = fig.add_subplot(6, len(indexes), 0*len(indexes) + 1 + i)
+                ax2 = fig.add_subplot(6, len(indexes), 1*len(indexes) + 1 + i)
+                ax3 = fig.add_subplot(6, len(indexes), 2*len(indexes) + 1 + i)
+                ax4 = fig.add_subplot(6, len(indexes), 3*len(indexes) + 1 + i)
+                ax5 = fig.add_subplot(6, len(indexes), 4*len(indexes) + 1 + i)
+                ax6 = fig.add_subplot(6, len(indexes), 5*len(indexes) + 1 + i)
                 #
-                fig.suptitle('sample {}'.format(ind), fontsize=12)
+                i = i + 1
                 #
-                ax1.set_title("ground-truth background")
-                ax1.imshow(green_image * where_green)
+                ax1.set_title("ground-truth body mask")
+                ax1.imshow(np.where(gt_body_mask == 1., 1., gt_green_image))
                 ax1.axis("off")
                 #
                 ax2.set_title("predicted mask")
-                ax2.imshow(curr_mask)
+                ax2.imshow(predicted_body_mask)
                 ax2.axis("off")
                 #
-                ax3.set_title("mask error: {:.2f}%".format(100 * mask_match), fontsize=11)
-                ax3.imshow(error_mask_green / 2 + 0.5)
+                ax3.set_title("mask error: {:.2f}%".format(100 * iou_body_mask), fontsize=11)
+                ax3.imshow((gt_body_mask - predicted_body_mask) / 2 + 0.5)
                 ax3.axis("off")
-                #
                 #
                 ax4.set_title("masked ground-truth")
                 ax4.imshow(checkerboard)
-                ax4.imshow(curr_masked_green_image)
+                ax4.imshow(transparent_masked_gt_image)
                 ax4.axis("off")
                 #
                 ax5.set_title("masked prediction")
                 ax5.imshow(checkerboard)
-                ax5.imshow(curr_masked_image)
+                ax5.imshow(transparent_masked_predicted_image)
                 ax5.axis("off")
                 #
-                ax6.set_title("appearance error: {:2f}%".format(100 * appearance_match), fontsize=11)
+                ax6.set_title("appearance error: {:.2f}%".format(100 * appearance_match), fontsize=11)
                 ax6.imshow(checkerboard)
-                ax6.imshow(curr_masked_image)
+                ax6.imshow(masked_image_error / 2 + 0.5)
                 ax6.axis("off")
+                #
+                #fig.savefig(".temp/mask_and_appearance_match/evaluation.svg".format(ind))
 
     # print the stats
-    print("mask match = {mean} +/- {std}".format(mean=np.mean(all_mask_match), std=np.std(all_mask_match)))
+    print("mask match = {mean} +/- {std}".format(mean=np.mean(all_iou_body), std=np.std(all_iou_body)))
     print("appearance match = {mean} +/- {std}".format(mean=np.mean(all_appearance_match), std=np.std(all_appearance_match)))
 
     plt.show(block=False)
@@ -319,6 +323,8 @@ def fit_gmm(dir_green_dataset="dataset/generated/green", dir_model="model/traine
     ax2.set_ylim([0, 1.2])
     ax2.legend(loc="upper right")
     #
+    #fig.savefig(".temp/fitted_GMM/gmm.svg")
+    #
     plt.show(block=False)
     plt.pause(0.001)
 
@@ -336,12 +342,10 @@ def explore_joint_space(dir_model="model/trained", motor_input_ref=None):
     """
 
     # load the network
-    saver, motor_input, predicted_image, predicted_error = load_network(dir_model)
+    saver, motor_input, net_predicted_image, net_predicted_error = load_network(dir_model)
 
     # get parameters
     n_joints = motor_input.get_shape()[1].value
-    height = predicted_image.get_shape()[1].value
-    width = predicted_image.get_shape()[2].value
 
     # generate the reference motor input if necessary
     if motor_input_ref is None:
@@ -349,9 +353,6 @@ def explore_joint_space(dir_model="model/trained", motor_input_ref=None):
 
     # create the sensory normalizer
     s_normalizer = Normalizer(low=0, high=1, min_data=0, max_data=1)  # identity mapping in this case, as the pixel values are already in [0, 1]
-
-    # create a background checkerboard
-    checkerboard = create_checkerboard(height, width)
 
     # display the reconstructions
     with tf.Session() as sess:
@@ -371,13 +372,11 @@ def explore_joint_space(dir_model="model/trained", motor_input_ref=None):
                 delta = [[val if i == joint else 0. for i in range(n_joints)]]
 
                 # predict image
-                curr_image = sess.run(predicted_image, feed_dict={motor_input: motor_input_ref + delta})
-                curr_image = curr_image[0]
-                curr_image = s_normalizer.reconstruct(curr_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
+                predicted_image = sess.run(net_predicted_image, feed_dict={motor_input: motor_input_ref + delta})[0]
+                predicted_image = s_normalizer.reconstruct(predicted_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
 
                 # predict error
-                curr_error = sess.run(predicted_error, feed_dict={motor_input: motor_input_ref + delta})
-                curr_error = curr_error[0]
+                predicted_error = sess.run(net_predicted_error, feed_dict={motor_input: motor_input_ref + delta})[0]
 
                 # display
                 ax1 = fig.add_subplot(2, 6, 1 + index)
@@ -386,12 +385,14 @@ def explore_joint_space(dir_model="model/trained", motor_input_ref=None):
                 fig.suptitle('joint {}'.format(joint), fontsize=12)
                 #
                 ax1.set_title("predicted image")
-                ax1.imshow(curr_image)
+                ax1.imshow(predicted_image)
                 ax1.axis("off")
                 #
                 ax2.set_title("predicted error")
-                ax2.imshow(curr_error)
+                ax2.imshow(predicted_error)
                 ax2.axis("off")
+            #
+            # fig.savefig(".temp/exploration/joint_{}.svg".format(joint))
 
     plt.show(block=False)
     plt.pause(0.001)
@@ -420,12 +421,12 @@ def generate_video(dir_model="model/trained", n_samples=2000, dir_video="temp/vi
     s_normalizer = Normalizer(low=0, high=1, min_data=0, max_data=1)  # identity mapping in this case, as the pixel values are already in [0, 1]
 
     # load the network
-    saver, motor_input, predicted_image, predicted_error = load_network(dir_model)
+    saver, motor_input, net_predicted_image, net_predicted_error = load_network(dir_model)
 
     # get parameters
     n_joints = motor_input.get_shape()[1].value
-    height = predicted_image.get_shape()[1].value
-    width = predicted_image.get_shape()[2].value
+    height = net_predicted_image.get_shape()[1].value
+    width = net_predicted_image.get_shape()[2].value
 
     # create a background checkerboard
     checkerboard = create_checkerboard(height, width)
@@ -463,23 +464,22 @@ def generate_video(dir_model="model/trained", n_samples=2000, dir_video="temp/vi
             curr_motor = trajectory[[k], :]
 
             # predict image
-            curr_image = sess.run(predicted_image, feed_dict={motor_input: curr_motor})
-            curr_image = curr_image[0]
-            curr_image = s_normalizer.reconstruct(curr_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
+            predicted_image = sess.run(net_predicted_image, feed_dict={motor_input: curr_motor})[0]
+            predicted_image = s_normalizer.reconstruct(predicted_image)  # identity mapping in this case, as the pixel values are already in [0, 1]
 
             # predict error
-            curr_error = sess.run(predicted_error, feed_dict={motor_input: curr_motor})
-            curr_error = curr_error[0]
+            predicted_error = sess.run(net_predicted_error, feed_dict={motor_input: curr_motor})[0]
 
             # build mask
-            curr_mask = (curr_error <= 0.056).astype(float)
+            predicted_mask = (predicted_error <= 0.056).astype(float)
 
             # build the masked image
-            curr_masked_image = np.dstack((curr_image, np.mean(curr_mask, axis=2)))
+            alpha_channel = np.mean(predicted_mask, axis=2)
+            transparent_masked_predicted_image = np.dstack((predicted_image * predicted_mask, alpha_channel))
 
             # display the motor configuration with a trace
             ax0.cla()
-            ax0.set_title('$m_1, m_2, m_3$')
+            ax0.set_title("motor space $(m_1, m_2, m_3)$")
             ax0.plot(trajectory[max(0, k - 48):k, 0], trajectory[max(0, k - 48):k, 1], trajectory[max(0, k - 48):k, 2], 'b-')
             ax0.plot(trajectory[k - 1:k, 0], trajectory[k - 1:k, 1], trajectory[k - 1:k, 2], 'ro')
             ax0.set_xlim(-1, 1)
@@ -490,7 +490,7 @@ def generate_video(dir_model="model/trained", n_samples=2000, dir_video="temp/vi
             ax0.set_zticklabels([])
             #
             ax1.cla()
-            ax1.set_title('$m_2, m_3, m_4$')
+            ax1.set_title("motor space $(m_2, m_3, m_4)$")
             ax1.plot(trajectory[max(0, k - 48):k, 1], trajectory[max(0, k - 48):k, 2], trajectory[max(0, k - 48):k, 3], 'b-')
             ax1.plot(trajectory[k - 1:k, 1], trajectory[k - 1:k, 2], trajectory[k - 1:k, 3], 'ro')
             ax1.set_xlim(-1, 1)
@@ -503,23 +503,23 @@ def generate_video(dir_model="model/trained", n_samples=2000, dir_video="temp/vi
             # display the predicted image
             ax2.cla()
             ax2.set_title("predicted image")
-            ax2.imshow(curr_image)
+            ax2.imshow(predicted_image)
             ax2.axis("off")
             #
             ax3.cla()
             ax3.set_title("predicted error")
-            ax3.imshow(curr_error)
+            ax3.imshow(predicted_error)
             ax3.axis("off")
             #
             ax4.cla()
             ax4.set_title("predicted mask")
-            ax4.imshow(curr_mask)
+            ax4.imshow(predicted_mask)
             ax4.axis("off")
             #
             ax5.cla()
             ax5.set_title("masked prediction")
             ax5.imshow(checkerboard)
-            ax5.imshow(curr_masked_image)
+            ax5.imshow(transparent_masked_predicted_image)
             ax5.axis("off")
 
             plt.show(block=False)
@@ -550,7 +550,7 @@ if __name__ == "__main__":
     dir_green_dataset = args.dir_green_dataset
     dir_video = args.dir_video
 
-    reconstruct_training_data(dir_model=dir_model, dir_dataset=dir_dataset, indexes=3)
+    reconstruct_data(dir_model=dir_model, dir_dataset=dir_dataset, indexes=3)
     evaluate_body_image(dir_model=dir_model, dir_green_dataset=dir_green_dataset, indexes=3)
     fit_gmm(dir_green_dataset=dir_green_dataset, dir_model=dir_model, indexes=100)
     explore_joint_space(dir_model=dir_model)
