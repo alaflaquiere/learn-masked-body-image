@@ -72,6 +72,7 @@ python test_network.py -dm model/trained_nominal_32filters_scheduledweighterror
 
 It will also create a video of a random exploration of the motor space and save it in "temp/video".
 
+[![Motor_exploration](illustrations/giffed.gif)](https://youtu.be/AbJNd-P_lOI)
 
 ## Advanced control
 
