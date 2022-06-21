@@ -1,5 +1,5 @@
 matplotlib==3.0.3
-numpy==1.16.2
+numpy==1.22.0
 opencv-python==4.0.0.21
 pybullet==2.4.6
 qibullet==1.0.6
